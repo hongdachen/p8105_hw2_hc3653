@@ -1,0 +1,219 @@
+---
+title: "p8105_hw2_hc3653"
+author: "Hongda Chen"
+date: "2025-09-30"
+output: 
+  html_document
+---
+```{r echo=TRUE, message=FALSE}
+library(tidyverse)
+library(tidyr)
+library(readxl)
+library(dplyr)
+```
+
+# Problem 1
+```{r}
+pols_month_df = read.csv(
+  "/Users/hongdachen/Desktop/p8105_hw2_hc3653/fivethirtyeight_datasets/pols-month.csv")
+snp_df = read.csv("/Users/hongdachen/Desktop/p8105_hw2_hc3653/fivethirtyeight_datasets/snp.csv")
+unemploy_df = read.csv("/Users/hongdachen/Desktop/p8105_hw2_hc3653/fivethirtyeight_datasets/unemployment.csv")
+```
+Clean the pols-month.csv
+```{r}
+pols_month_df_clean = pols_month_df %>% 
+  separate(col = mon, into = c("year", "month", "day"), sep = "-", convert = TRUE, remove = FALSE) %>%
+  mutate(month = month.name[month]) %>%
+  select(-mon) %>%
+  mutate(
+    president = case_when(prez_gop == 1 ~ "gop",
+                          prez_dem == 1 ~ "dem")) %>%
+  select(-prez_gop, -prez_dem, -day)
+  
+```
+Clean the snp.csv
+```{r}
+snp_df_clean = snp_df %>% 
+  mutate(date = mdy(date), year = year(date), month = month(date), day = day(date)) %>%
+  mutate(month = month.name[month]) %>%
+  select(year, month, everything()) %>%
+  arrange(year, month) %>%
+  select(-date, -day)
+```
+Clean the unemployment data
+```{r}
+unemploy_df_longer = pivot_longer(unemploy_df,
+                                 Jan:Dec,
+                                 names_to = "month",
+                                 values_to = "unemployment_rate") 
+unemploy_df_clean = unemploy_df_longer %>% 
+  rename(year = Year)
+```
+Merging data frames
+```{r}
+pols_snp = left_join(snp_df_clean, pols_month_df_clean, by = c("year","month"))
+pols_snp_unemploy = full_join( unemploy_df_clean, pols_snp, by = c("year","month"))
+```
+
+```{r collapse=TRUE}
+dim(pols_month_df_clean)
+range_years_pols = max(pols_month_df_clean$year) - min(pols_month_df_clean$year)
+range_years_pols
+names(pols_month_df_clean)
+```
+The pols-month dataset has 822 rows and 9 columns, while the range of years is 68.
+This dataset contains key variables like "gov_gop","sen_gop", "rep_gop", "gov_dem",
+"sen_dem","rep_dem" and "president".
+
+```{r collapse=TRUE}
+dim(snp_df_clean)
+range_years_snp = max(snp_df_clean$year) - min(snp_df_clean$year)
+range_years_snp
+names(snp_df_clean)
+```
+This snp dataset has 787 rows and 3 columns, while the range of years is 99.
+This dataset contains a key variable named "close".
+
+```{r collapse=TRUE}
+dim(unemploy_df_clean)
+range_years_unemploy = max(unemploy_df_clean$year) - min(unemploy_df_clean$year)
+range_years_unemploy
+names(unemploy_df_clean)
+```
+This unemployment dataset has 816 rows and 3 columns, while the range of year is 67.
+It contains a key variable named "unemployment_rate"
+
+```{r collapse=TRUE}
+dim(pols_snp_unemploy)
+range_years = max(pols_snp_unemploy$year) - min(pols_snp_unemploy$year)
+range_years
+names(pols_snp_unemploy)
+```
+The resulting dataset has 1556 rows and 11 columns, and the range of years is 120.
+This dataset contains 9 key variables like "unemployment_rate", "close", "gov_gop",
+"sen_gop", "rep_gop", "gov_dem", "sen_dem", "rep_dem" and "president".
+
+# Problem 2
+Mr.Trash Wheel
+```{r}
+mr_trash_wheel <- 
+  readxl::read_excel("/Users/hongdachen/Desktop/p8105_hw2_hc3653/202509 Trash Wheel Collection Data.xlsx", sheet = "Mr. Trash Wheel", range = "A2:N710") %>% 
+  janitor::clean_names() %>%
+  drop_na(dumpster) %>%
+  mutate(sports_balls = as.integer(round(sports_balls)))
+```
+Professor Trash Wheel
+```{r}
+prof_trash_wheel <-
+  readxl::read_excel("/Users/hongdachen/Desktop/p8105_hw2_hc3653/202509 Trash Wheel Collection Data.xlsx", sheet = "Professor Trash Wheel", range = "A2:M135") %>%
+  janitor::clean_names() %>%
+  drop_na(dumpster) 
+```
+Gywnnda Trash Wheel
+```{r}
+Gywndda_trash_wheel <-
+  readxl::read_excel("/Users/hongdachen/Desktop/p8105_hw2_hc3653/202509 Trash Wheel Collection Data.xlsx", sheet = "Gwynns Falls Trash Wheel", range = "A2:L352") %>%
+  janitor::clean_names() %>%
+  drop_na(dumpster) 
+```
+All trash wheel
+```{r}
+mr_trash_wheel$year <- as.numeric(mr_trash_wheel$year)
+Gywndda_trash_wheel$year <- as.numeric(Gywndda_trash_wheel$year)
+prof_trash_wheel$year <- as.numeric(prof_trash_wheel$year)
+```
+
+```{r}
+all_trash_wheel = prof_trash_wheel %>%
+  full_join( Gywndda_trash_wheel, by = c("dumpster","year","month")) %>%
+  full_join( mr_trash_wheel, by = c("dumpster","year"))
+```
+
+The resulting dataset contains `r nrow(all_trash_wheel)` observations and `r ncol(all_trash_wheel)`
+variables. Here, it contains key variables include `r mr_trash_wheel %>% select(-dumpster, -year, -month, -date) %>% names()`. The total weight of trash collected by Professor Trash Wheel is `r sum(prof_trash_wheel$weight_tons)`. The total number of cigarettes butts collected by Gwynnda in June of 2022 is`r as.character(sum(Gywndda_trash_wheel$cigarette_butts[Gywndda_trash_wheel$month == "June" & Gywndda_trash_wheel$year == "2022"]))`.
+
+# Problem 3
+
+```{r echo=TRUE, message=FALSE}
+zip_code_clean = 
+  read_csv("/Users/hongdachen/Desktop/p8105_hw2_hc3653/zillow_data/Zip Codes.csv") %>%
+  janitor::clean_names() %>%
+  select(county, zip_code, everything()) %>%
+  arrange(county, zip_code)
+
+```
+
+```{r}
+zori = 
+  read.csv("/Users/hongdachen/Desktop/p8105_hw2_hc3653/zillow_data/Zip_zori_uc_sfrcondomfr_sm_month_NYC.csv") 
+```
+
+```{r}
+zori_clean <- zori %>%
+  rename( Zip_code = RegionName) %>%
+  rename( county = CountyName) %>%
+  mutate(county = str_replace(county, " County", "")) %>%
+  janitor::clean_names() %>%
+  select(county, zip_code, everything()) %>%
+  arrange(county, zip_code) %>%
+  select(-state_name) %>%
+  filter(if_any(x2015_01_31:x2024_08_31, ~!is.na(.)))
+```
+
+```{r}
+zori_zipcode = zip_code_clean %>%
+  full_join(zori_clean, by = c("county", "zip_code")) %>%
+  filter(if_any(x2015_01_31:x2024_08_31, ~!is.na(.)))
+```
+
+By looking at the combined dataset, there are `r nrow(zori_zipcode)` observations, 
+`r length(unique(zori_zipcode$zip_code))` unique zip codes, and `r length(unique(zori_zipcode$neighborhood))` unique neighborhoods. 
+
+The zip codes appear only in ZIP code dataset are the following: `r as.character(setdiff(zip_code_clean$zip_code, zori_clean$zip_code))`. 
+
+Some zip codes are not included in Zillow dataset, eg. 10311, it does not belong to a neighborhood. Other reasons could be no rental activity or history, cancelled or changed postal code and etc. 
+
+
+* The drop in price during 2020
+```{r}
+jan20_21 = zori_zipcode %>% 
+  select(county, zip_code, neighborhood, x2020_01_31:x2021_01_31) %>%
+  filter(if_any(x2020_01_31:x2021_01_31, ~!is.na(.))) %>%
+  pivot_longer(cols = x2020_01_31:x2021_01_31,
+               names_to = "month",
+               values_to = "price") 
+```
+
+```{r echo=TRUE,message=FALSE}
+price_drop = jan20_21 %>% 
+  group_by(county, zip_code, neighborhood) %>%
+  summarise(max_price = max(price, na.rm = TRUE),
+            min_price = min(price, na.rm = TRUE)) %>%
+  mutate(price_change = max_price - min_price) 
+```
+
+```{r}
+top10_drop = price_drop %>% arrange(desc(price_change)) %>% 
+  head(10)
+print(top10_drop)
+```
+As shown above, the largest price drop happened in lower manhattan, 10007. The
+price changes 1132.7373 during 2020. While the smallest price change happened 
+in Chelsea and Clinton, 10011. The drop of price is 739.9935. The lower east side,
+lower manhattan and Chelsea and Clinton are the most common neighborhoods that 
+suffered the largest price drop.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
